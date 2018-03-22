@@ -69,7 +69,7 @@ XYZ_CONSTS(float, home_bump_mm,   HOME_BUMP_MM);
 XYZ_CONSTS(signed char, home_dir, HOME_DIR);
 
 // Relative Mode. Enable with G91, disable with G90.
-bool relative_mode = false;
+bool relative_mode; // = false;
 
 /**
  * Cartesian Current Position
@@ -89,7 +89,7 @@ float destination[XYZE] = { 0.0 };
 
 
 // The active extruder (tool). Set with T<extruder> command.
-uint8_t active_extruder = 0;
+uint8_t active_extruder; // = 0;
 
 // Extruder offsets
 #if HOTENDS > 1
@@ -266,8 +266,6 @@ void buffer_line_to_destination(const float fr_mm_s) {
       if (DEBUGGING(LEVELING)) DEBUG_POS("prepare_uninterpolated_move_to_destination", destination);
     #endif
 
-    gcode.refresh_cmd_timeout();
-
     #if UBL_SEGMENTED
       // ubl segmented line will do z-only moves in single segment
       ubl.prepare_segmented_line_to(destination, MMS_SCALED(fr_mm_s ? fr_mm_s : feedrate_mm_s));
@@ -290,7 +288,7 @@ void buffer_line_to_destination(const float fr_mm_s) {
  *  Plan a move to (X, Y, Z) and set the current_position
  *  The final current_position may not be the one that was requested
  */
-void do_blocking_move_to(const float &rx, const float &ry, const float &rz, const float &fr_mm_s/*=0.0*/) {
+void do_blocking_move_to(const float rx, const float ry, const float rz, const float &fr_mm_s/*=0.0*/) {
   const float old_feedrate_mm_s = feedrate_mm_s;
 
   #if ENABLED(DEBUG_LEVELING_FEATURE)
@@ -435,12 +433,10 @@ void bracket_probe_move(const bool before) {
     saved_feedrate_mm_s = feedrate_mm_s;
     saved_feedrate_percentage = feedrate_percentage;
     feedrate_percentage = 100;
-    gcode.refresh_cmd_timeout();
   }
   else {
     feedrate_mm_s = saved_feedrate_mm_s;
     feedrate_percentage = saved_feedrate_percentage;
-    gcode.refresh_cmd_timeout();
   }
 }
 
@@ -610,7 +606,7 @@ float soft_endstop_min[XYZ] = { X_MIN_BED, Y_MIN_BED, Z_MIN_POS },
 
       LOOP_XYZE(i) raw[i] += segment_distance[i];
 
-      #if ENABLED(DELTA)
+      #if ENABLED(DELTA) && HOTENDS < 2
         DELTA_IK(raw); // Delta can inline its kinematics
       #else
         inverse_kinematics(raw);
@@ -859,7 +855,6 @@ float soft_endstop_min[XYZ] = { X_MIN_BED, Y_MIN_BED, Z_MIN_POS },
  */
 void prepare_move_to_destination() {
   clamp_to_software_endstops(destination);
-  gcode.refresh_cmd_timeout();
 
   #if ENABLED(PREVENT_COLD_EXTRUSION) || ENABLED(PREVENT_LENGTHY_EXTRUDE)
 
@@ -952,6 +947,7 @@ inline float get_homing_bump_feedrate(const AxisEnum axis) {
    */
   void sensorless_homing_per_axis(const AxisEnum axis, const bool enable/*=true*/) {
     switch (axis) {
+      default: break;
       #if X_SENSORLESS
         case X_AXIS:
           tmc_sensorless_homing(stepperX, enable);
@@ -1304,10 +1300,10 @@ void homeaxis(const AxisEnum axis) {
     if (axis == Z_AXIS && STOW_PROBE()) return;
   #endif
 
-  // Clear retracted status if homing the Z axis
+  // Clear z_lift if homing the Z axis
   #if ENABLED(FWRETRACT)
     if (axis == Z_AXIS)
-      for (uint8_t i = 0; i < EXTRUDERS; i++) fwretract.retracted[i] = false;
+      fwretract.hop_amount = 0.0;
   #endif
 
   #if ENABLED(DEBUG_LEVELING_FEATURE)
